@@ -1,0 +1,67 @@
+$PREVLOCATIONFOLDER = "$env:USERPROFILE\Desktop\.bringdrop"
+$DESKTOPPATH = "$env:USERPROFILE\Desktop"
+
+function bring($query){
+    $result =  @(Get-ChildItem -Path "$DESKTOPPATH\**\" -Recurse -Include "*$query*" | Select-Object FullName)
+
+    if($result.length -eq 0){
+        Write-Output 'Could not locate any files'
+    }elseif(!$result.length -or $result.length -eq 1){
+        $path = $result.FullName    
+    }else{
+        Write-Output "Many files or folders found:" 
+        for($i=0; $i -lt $result.length; $i++){
+            Write-Host ($i+1) "`t" $result[$i].FullName
+        }
+        $selected = ((Read-Host "Choose one of the following (1 - $i), or 0 to cancel")-1)
+        if($selected -eq -1){return}
+        $path = $result[$selected].FullName
+    }
+    if($path){
+        Write-Host "Bringing file/folder from " -NoNewline
+        Write-Host $path -NoNewline -ForegroundColor Cyan
+        Write-Host " to desktop" 
+
+        # save its previous location
+        if(!(Test-Path -Path $PREVLOCATIONFOLDER)){
+            New-Item $PREVLOCATIONFOLDER -Type Directory
+            (Get-Item $PREVLOCATIONFOLDER -Force).attributes='Hidden'
+        }
+        $prevdir = Split-Path $path -Resolve
+        $filename = Split-Path $path -Leaf
+        Write-Output $prevdir > "$PREVLOCATIONFOLDER\$filename"
+
+        # bring the file to desktop
+        Move-Item $path $DESKTOPPATH
+    }
+}
+
+function drop($query){
+    $result =  @(Get-ChildItem -Path "$DESKTOPPATH\" -Directory | Where-Object{$_.Name -like "*$query*"})
+    $result += @(Get-ChildItem -Path "$DESKTOPPATH\*"-Include "*$query*" | Select-Object FullName)
+
+    if($result.length -eq 0){
+        Write-Output 'Could not locate any files'
+    }elseif(!$result.length -or $result.length -eq 1){
+        $path = $result.FullName    
+    }else{
+        Write-Output "Many files or folders found:" 
+        for($i=0; $i -lt $result.length; $i++){
+            Write-Host ($i+1) "`t" $result[$i].FullName
+        }
+        $selected = ((Read-Host "Choose one of the following (1 - $i), or 0 to cancel")-1)
+        if($selected -eq -1){return}
+        $path = $result[$selected].FullName
+    }
+    if($path){
+        $filename = Split-Path $path -Leaf
+        $dest = Get-Content "$PREVLOCATIONFOLDER\$filename"
+
+        Write-Host "Dropping file/folder " -NoNewline
+        Write-Host (Split-Path $filename -leaf) -NoNewline -ForegroundColor Cyan
+        Write-Host " from desktop to " -NoNewline
+        Write-Host (Split-Path $dest -leaf) -ForegroundColor Cyan
+
+        Move-Item $path $dest
+    }
+}
